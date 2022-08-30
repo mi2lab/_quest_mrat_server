@@ -3,9 +3,21 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.9.2/firebase
 import { getDatabase, ref, set, get, onValue, child } from "https://www.gstatic.com/firebasejs/9.9.2/firebase-database.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.9.2/firebase-analytics.js";
 
-let test_json = '{"posX":0.0,"posY":0.0,"posZ":-1.1540000438690186,"rotX":0.0,"rotY":0.0,"rotZ":0.0}';
-let test_result = JSON.parse(test_json);
-console.log(test_result);
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+    apiKey: "AIzaSyAwDcSoSqko3I6uxszuLtcDnCvoIGH6vbA",
+    authDomain: "mrat-passthrough-f5e34.firebaseapp.com",
+    databaseURL: "https://mrat-passthrough-f5e34-default-rtdb.firebaseio.com",
+    projectId: "mrat-passthrough-f5e34",
+    storageBucket: "mrat-passthrough-f5e34.appspot.com",
+    messagingSenderId: "447706271029",
+    appId: "1:447706271029:web:eb9a55ca8903d552e0d07c",
+    measurementId: "G-JF0P7XM5R7"
+  };
+  
+const server_address = "http://192.168.56.1:8080/";
+const json_file = "json/scene.json";
 
 class LivePos {
     constructor() {
@@ -99,7 +111,12 @@ class LivePosList {
                 this.add(retrieved_user_data.key);//, retrieved_user_data.val().delta_time);
             }
         });
+        //console.log(retrieved)
         if (retrieved.size != Object.keys(this.users).length) {
+            console.log("Not same!");
+            console.log(this.users);
+            console.log(retrieved_user_data);
+
             let retrieved_keys = [];
             retrieved.forEach((retrieved_user_data) => {
                 retrieved_keys.push(retrieved_user_data.key);
@@ -109,32 +126,19 @@ class LivePosList {
                     delete this.users.key;
                 }
             }
+            console.log(this.users);
+            console.log(retrieved_user_data);
         }
     }
-    print(){
+    clear() {
+        this.users = {};
+    }
+    print() {
         for (let key in this.users) {
             console.log(this.users[key]);
         }
     }
 }
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAwDcSoSqko3I6uxszuLtcDnCvoIGH6vbA",
-  authDomain: "mrat-passthrough-f5e34.firebaseapp.com",
-  databaseURL: "https://mrat-passthrough-f5e34-default-rtdb.firebaseio.com",
-  projectId: "mrat-passthrough-f5e34",
-  storageBucket: "mrat-passthrough-f5e34.appspot.com",
-  messagingSenderId: "447706271029",
-  appId: "1:447706271029:web:eb9a55ca8903d552e0d07c",
-  measurementId: "G-JF0P7XM5R7"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const dbRef = ref(getDatabase());
-const livePosList = new LivePosList(10);
 
 class DatabaseComm {
     constructor() {
@@ -159,6 +163,7 @@ class DatabaseComm {
                 if (snapshot.exists()) {
                     livePosList.update(snapshot);            
                 } else {
+                    livePosList.clear();
                     console.log("No data available");
                 }
                 //livePosList.print();
@@ -175,80 +180,227 @@ class DatabaseComm {
     }
 }
 
-var comm = new DatabaseComm();
-comm.start();
+function update_axis(x, y) {
+    d3.selectAll(".axis").remove();
 
+    const xAxisGrid = d3.axisBottom(x).tickSize(-height).tickFormat("").ticks(10);
+    const yAxisGrid = d3.axisLeft(y).tickSize(-width).tickFormat("").ticks(10);
 
- // set the dimensions and margins of the graph
- var margin = {top: 20, right: 20, bottom: 30, left: 50},
- width = 960 - margin.left - margin.right,
- height = 500 - margin.top - margin.bottom;
+    svg.append("g")
+        .attr("class", "axis axis-grid")
+        .attr("style", "opacity: 0.15")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxisGrid);
 
- // set the ranges
- var x = d3.scaleLinear().range([0, width]);
- var y = d3.scaleLinear().range([height, 0]);
+    svg.append("g")
+        .attr("class", "axis axis-grid")
+        .attr("style", "opacity: 0.15")
+        .call(yAxisGrid);
 
- // append the svg obgect to the body of the page
- // appends a 'group' element to 'svg'
- // moves the 'group' element to the top left margin
- var svg = d3.select("body").append("svg")
-    .attr("id", "main_canvas")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g").attr("transform",
-       "translate(" + margin.left + "," + margin.top + ")");
+    // Add the X Axis
+    svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", "translate(0," + height / 2 + ")")
+        .call(d3.axisBottom(x));
 
+    // Add the Y Axis
+    svg.append("g")
+        .attr("class", "axis")
+        .attr("transform", "translate(" + width / 2 + ", 0)")
+        .call(d3.axisLeft(y));
+}
 
-x.domain([-5, 5]);
-y.domain([-5, 5]);
+function update_json_data() {
+    fetch(server_address + json_file)
+    .then((response) => response.json())
+    .then((json) => {
+        json_data = json;
+    });
+}
 
-// Add the valueline path.
-/*
-svg.append("path")
-    .data([data])
-    .attr("class", "line")
-    .attr("d", valueline);
+function scale_width(w) {
+    return x(w) - x(0);
+}
+
+function scale_height(h) {
+    return y(0) - y(h);
+}
+
+function to_radius(a) {
+    /*
+    let local_a = a % 360;
+    if (local_a < 0) {
+        local_a = local_a + 360;
+    }
     */
+    return a / 180 * Math.PI;
+}
 
-// Add the X Axis
-svg.append("g")
-    .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+function update_display() {
+    d3.selectAll(".user_legend").remove();
+    d3.selectAll(".user_point").remove();
+    d3.selectAll(".objects").remove();
 
-// Add the Y Axis
-svg.append("g")
-    .call(d3.axisLeft(y));
+    x.domain([-x_length - 2, x_length + 2]);
+    y.domain([-y_length - 2, y_length + 2]);
+    update_axis(x, y);
 
-var display_interval = window.setInterval(function(){
+    let local_x_length = 5;
+    let local_y_length = 5;
+
     for (let user_name in livePosList.users) {
         let data = livePosList.users[user_name].file;
         let color = livePosList.users[user_name].color;
         //console.log(color);
-        d3.selectAll("." + user_name).remove();
+        //d3.selectAll("." + user_name).remove();
         for (let i = 0; i < data.length; i ++) {
             //console.log(data.peek(i).x);
             //console.log(data.peek(i).z);
+            let opacity;
+            if (i == data.length - 1){
+                opacity = 1;
+            }
+            else {
+                opacity = 0.2 - 0.2 / (i + 1);
+            }
+
+            if (Math.abs(data.peek(i).x) > local_x_length) {
+                local_x_length = Math.abs(data.peek(i).x);
+            }
+            if (Math.abs(data.peek(i).y) > local_y_length) {
+                local_y_length = Math.abs(data.peek(i).z);
+            }
+
+            let mapped_start_angle = to_radius(data.peek(i).rot_y - 40);
+            let mapped_end_angle = to_radius(data.peek(i).rot_y + 40);
+            //console.log(mapped_rot_y);
+            
             svg.append("path")
-            .attr("transform", "translate(" + x(data.peek(i).x) + ", " + y(data.peek(i).z) + ")")
-            .attr("d", d3.arc()
-              .innerRadius( 15 )
-              .outerRadius( 20 )
-              .startAngle( data.peek(i).rot_y - 1 )     // It's in radian, so Pi = 3.14 = bottom.
-              .endAngle( data.peek(i).rot_y + 1 )       // 2*Pi = 6.28 = top
-              )
-            .attr('stroke', 'black')
-            .attr('fill', '#' + color);
-            /*
-            .append("circle")
                 .attr("class", user_name)
+                .attr("class", "user_point")
+                .attr("transform", "translate(" + x(data.peek(i).x) + ", " + y(data.peek(i).z) + ")")
+                .attr("d", d3.arc()
+                    .innerRadius(15)
+                    .outerRadius(20)
+                    .startAngle(mapped_start_angle)
+                    .endAngle(mapped_end_angle)
+                    )
+                .attr("opacity", opacity)
+                .attr("stroke", "black")
+                .attr("fill", "#" + color);
+            svg.append("circle")
+                .attr("class", user_name)
+                .attr("class", "user_point")
                 .attr("cx", x(data.peek(i).x))
                 .attr("cy", y(data.peek(i).z))
-                .attr("r", 6)
-                .style("fill", "green");
-                */
+                .attr("r", 5)
+                .attr("stroke", "black")
+                .attr("fill", "#" + color);
+        }
+
+        if (local_x_length > 5) {
+            x_length = local_x_length;
+        }
+        else {
+            x_length = 5;
+        }
+
+        if (local_y_length > 5) {
+            y_length = local_y_length;
+        }
+        else {
+            y_length = 5;
+        }
+        
+        legend.append("p")
+            .text("■ " + user_name)
+            .attr("class", "user_legend")
+            .attr("style", 
+                "color:#" + color
+                + "; font-size: 150%"
+                );
+    }
+
+    if (json_data) {
+        for (let i = 0; i < json_data["Objects"].length; i ++) {
+            //console.log(data.peek(i).x);
+            //console.log(data.peek(i).z);
+            let object_width = 0.5;
+            let object_height = 0.5;
+            let object_name = "";
+
+            if ("width" in json_data["Objects"][i]) {
+                object_width = json_data["Objects"][i].width;
+            }
+            if ("height" in json_data["Objects"][i]) {
+                object_height = json_data["Objects"][i].height;
+            }
+            if ("name" in json_data["Objects"][i]) {
+                object_name = json_data["Objects"][i].name;
+            }
+
+            let mapped_x = x(json_data["Objects"][i].x);
+            let mapped_y = y(json_data["Objects"][i].y);
+            let mapped_object_width = scale_width(object_width);
+            let mapped_object_height = scale_height(object_height);
+        
+            svg.append("rect")
+                .attr("class", "objects")
+                .attr("x", mapped_x)
+                .attr("y", mapped_y)
+                .attr("width", mapped_object_width)
+                .attr("height", mapped_object_height)
+                .attr("opacity", "0.4")
+                .attr("stroke", "black")
+                .attr("fill", "#111111");
+
+            svg.append("text")
+                .attr("class", "objects")
+                .text(object_name)
+                .attr("x", mapped_x + mapped_object_width + scale_width(0.1))
+                .attr("y", mapped_y + mapped_object_height);
         }
     }
-}, 500);
+}
+
+var json_data = "";
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const dbRef = ref(getDatabase());
+const livePosList = new LivePosList(10);
+
+var comm = new DatabaseComm();
+comm.start();
+
+var margin = {top: 20, right: 20, bottom: 30, left: 50},
+width = 960 - margin.left - margin.right,
+height = 500 - margin.top - margin.bottom;
+
+var x = d3.scaleLinear().range([0, width]);
+var y = d3.scaleLinear().range([height, 0]);
+
+var svg = d3.select("body").append("svg")
+    .attr("id", "main_canvas")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g").attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+var legend = d3.select("body").append("div")
+    .attr("id", "user_legend");
+
+//Default axis size
+var x_length = 5;
+var y_length = 5;
+
+update_json_data();
+var json_fetch_interval = window.setInterval(update_json_data, 5000);
+
+update_display();
+var display_interval = window.setInterval(update_display, 200);
+
+
 
 
 // Initialize Firebase
@@ -299,9 +451,4 @@ get(child(dbRef, `recordings_info_list`)).then((snapshot) => {
     console.error(error);
 });
 
-
-
-function updateLivePos() {
-    if ()
-}
 */
