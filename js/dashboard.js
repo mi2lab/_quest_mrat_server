@@ -15,7 +15,12 @@ const firebaseConfig = {
     appId: "1:447706271029:web:eb9a55ca8903d552e0d07c",
     measurementId: "G-JF0P7XM5R7"
   };
-  
+
+/*
+
+Modify this address to load scene
+
+*/
 const server_address = "http://192.168.56.1:8080/";
 const json_file = "json/scene.json";
 
@@ -138,18 +143,14 @@ class LivePosList {
             console.log(this.users[key]);
         }
     }
+    get length() {
+        return Object.keys(this.users).length;
+    }
 }
 
 class DatabaseComm {
     constructor() {
-        //this.app = initializeApp(firebaseConfig);
-        //this.db = getDatabase(this.app);
-        //this.db_ref = ref(getDatabase());
-
         this.debug_count;
-
-        //this.livePosList = new LivePosList(10);
-
         this.fetch_interval;
     }
     start() {
@@ -236,15 +237,7 @@ function to_radius(a) {
     return a / 180 * Math.PI;
 }
 
-function update_display() {
-    d3.selectAll(".user_legend").remove();
-    d3.selectAll(".user_point").remove();
-    d3.selectAll(".objects").remove();
-
-    x.domain([-x_length - 2, x_length + 2]);
-    y.domain([-y_length - 2, y_length + 2]);
-    update_axis(x, y);
-
+function update_display_users() {
     let local_x_length = 5;
     let local_y_length = 5;
 
@@ -320,7 +313,9 @@ function update_display() {
                 + "; font-size: 150%"
                 );
     }
+}
 
+function update_display_objects() {
     if (json_data) {
         for (let i = 0; i < json_data["Objects"].length; i ++) {
             //console.log(data.peek(i).x);
@@ -361,6 +356,33 @@ function update_display() {
                 .attr("y", mapped_y + mapped_object_height);
         }
     }
+}
+
+function update_display() {
+    d3.selectAll(".user_legend").remove();
+    d3.selectAll(".user_point").remove();
+    d3.selectAll(".objects").remove();
+
+    x.domain([-x_length - 2, x_length + 2]);
+    y.domain([-y_length - 2, y_length + 2]);
+    update_axis(x, y);
+
+    //console.log(livePosList.length);
+
+    if (livePosList.length == 0) {
+        legend.append("p")
+            .text("No user data.")
+            .attr("class", "user_legend")
+            .attr("style", 
+                "color:#000000"
+                + "; font-size: 150%"
+                );
+    }
+    else {
+        update_display_users();
+    }
+    update_display_objects();
+    
 }
 
 var json_data = "";
