@@ -21,8 +21,15 @@ const firebaseConfig = {
 Modify this address to load scene
 
 */
-const server_address = "http://192.168.56.1:8080/";
+const server_address = "http://127.0.0.1:8080/";
 const json_file = "json/scene.json";
+/*
+
+Modify this to change plot size
+
+*/
+const plot_width = 500;
+
 
 class LivePos {
     constructor() {
@@ -148,6 +155,38 @@ class LivePosList {
     }
 }
 
+class EventCollection {
+    constructor() {
+        this.events = {};
+    }
+    update(retrieved) {
+        retrieved.forEach((retrieved_event_data) => {
+            let retrieved_key = retrieved_event_data.key;
+            let retrieved_data = retrieved_event_data.val();
+            console.log(retrieved_data.user);
+            //console.log(retrieved_user);
+            //console.log(retrieved_data);
+            this.events[retrieved_key] = {};
+            this.events[retrieved_key].user = retrieved_data.user;
+            this.events[retrieved_key].level = retrieved_data.level;
+            this.events[retrieved_key].text = retrieved_data.text;
+            this.events[retrieved_key].time = retrieved_data.time;
+        });
+        this.print();
+    }
+    clear() {
+        this.events = {};
+    }
+    print() {
+        for (let event_key in this.events) {
+            console.log(this.events[event_key]);
+        }
+    }
+    get length() {
+        return Object.keys(this.events).length;
+    }
+}
+
 class DatabaseComm {
     constructor() {
         this.debug_count;
@@ -173,6 +212,12 @@ class DatabaseComm {
             });
             //this.debug_count ++;
         }, 500);
+        const eventRef = ref(db, "Events");
+        onValue(eventRef, (snapshot) => {
+            if (snapshot.exists()) {
+                eventCollection.update(snapshot);            
+            }
+        });
     }
     stop() {
         if (this.fetch_interval) {
@@ -287,6 +332,7 @@ function update_display_users() {
                 .attr("cx", x(data.peek(i).x))
                 .attr("cy", y(data.peek(i).z))
                 .attr("r", 5)
+                .attr("opacity", opacity)
                 .attr("stroke", "black")
                 .attr("fill", "#" + color);
         }
@@ -385,43 +431,117 @@ function update_display() {
     
 }
 
+function to_date_time(t) {
+    var local_t = t / 10000 - 2208988800000; 
+    let hh = Math.floor(local_t % 3600);
+    let mm = Math.floor((local_t % 3600) / 60);
+    let ss = local_t % 60;
+    return hh + " : " + mm + " : " + ss;
+}
+
+function update_events() {
+    console.log(eventCollection.length);
+    if (eventCollection.length === 0) {
+        d3.selectAll(".no_event_item").remove();
+        event_container.append("p")
+            .text("No events.")
+            .attr("class", "no_event_item")
+            .attr("style", 
+                "color:#000000"
+                + "; font-size: 150%"
+                );
+    }
+    else {
+        d3.selectAll(".no_event_item").remove();
+        d3.selectAll(".event_item").remove();
+        for (let event_item in eventCollection.events) {
+            let text = eventCollection.events[event_item].text;
+            let user = eventCollection.events[event_item].user;
+            let level = eventCollection.events[event_item].level;
+            let time = eventCollection.events[event_item].time;
+            let color = "000000";
+            let text_color = "000000";
+            if (livePosList.users[user]) {
+                color = livePosList.users[user].color;
+            }
+            if (level) {
+                if (level === 1) {
+                    text_color = "D1C12C";
+                }
+                else if (level === 2) {
+                    text_color = "990000";
+                }
+            }
+
+            event_container.append("p")
+                .attr("id", event_item)
+                .attr("class", "event_item");
+            d3.select("#" + event_item).append("span")
+                .text(time + " ")
+                .attr("style", 
+                "color:#666666; font-size: 100%"
+                );
+            d3.select("#" + event_item).append("span")
+                .text("■ " + user + ": ")
+                .attr("style", 
+                "color:#" + color
+                + "; font-size: 100%"
+                );
+            d3.select("#" + event_item).append("span")
+                .text(text)
+                .attr("style", 
+                "color:#" + text_color
+                + "; font-size: 100%"
+                );
+        }
+    }
+}
+
 var json_data = "";
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const dbRef = ref(getDatabase());
+const dbRef = ref(db);
 const livePosList = new LivePosList(10);
+const eventCollection = new EventCollection();
 
 var comm = new DatabaseComm();
 comm.start();
 
-var margin = {top: 20, right: 20, bottom: 30, left: 50},
-width = 960 - margin.left - margin.right,
-height = 500 - margin.top - margin.bottom;
+console.log(window.innerWidth);
+
+const margin = {top: 20, right: 20, bottom: 30, left: 50},
+width = plot_width - margin.left - margin.right,
+height = plot_width - margin.top - margin.bottom;
 
 var x = d3.scaleLinear().range([0, width]);
 var y = d3.scaleLinear().range([height, 0]);
 
-var svg = d3.select("body").append("svg")
+const svg = d3.select("body").append("svg")
     .attr("id", "main_canvas")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
     .append("g").attr("transform",
         "translate(" + margin.left + "," + margin.top + ")");
 
-var legend = d3.select("body").append("div")
+const legend = d3.select("body").append("div")
     .attr("id", "user_legend");
+
+const event_container = d3.select("body").append("div")
+.attr("id", "events");
 
 //Default axis size
 var x_length = 5;
 var y_length = 5;
 
 update_json_data();
-var json_fetch_interval = window.setInterval(update_json_data, 5000);
+const json_fetch_interval = window.setInterval(update_json_data, 5000);
 
 update_display();
-var display_interval = window.setInterval(update_display, 200);
+const display_interval = window.setInterval(update_display, 200);
 
+update_events();
+const event_interval = window.setInterval(update_events, 1000);
 
 
 
