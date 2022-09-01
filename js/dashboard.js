@@ -127,19 +127,21 @@ class LivePosList {
         if (retrieved.size != Object.keys(this.users).length) {
             console.log("Not same!");
             console.log(this.users);
-            console.log(retrieved_user_data);
 
             let retrieved_keys = [];
             retrieved.forEach((retrieved_user_data) => {
                 retrieved_keys.push(retrieved_user_data.key);
             });
+            console.log(retrieved_keys);
             for (let key in this.users) {
-                if (!key in retrieved_keys) {
-                    delete this.users.key;
+                //let local_user_name = key.toString();
+                //console.log(local_user_name + " " + (local_user_name in retrieved_keys));
+                if (!retrieved_keys.includes(key)) {
+                    console.log(key + " not in keys");
+                    delete this.users[key];
                 }
             }
             console.log(this.users);
-            console.log(retrieved_user_data);
         }
     }
     clear() {
