@@ -28,7 +28,16 @@ const json_file = "json/scene.json";
 Modify this to change plot size
 
 */
-const plot_width = 500;
+const plot_width = 700;
+/*
+
+Modify this to configure sync delta time
+
+*/
+const database_sync_time = 500;
+const canvas_update_time = 200;
+const json_update_time = 5000;
+const event_update_time = 1000;
 
 
 class LivePos {
@@ -213,7 +222,7 @@ class DatabaseComm {
                 console.error(error);
             });
             //this.debug_count ++;
-        }, 500);
+        }, database_sync_time);
         const eventRef = ref(db, "Events");
         onValue(eventRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -307,7 +316,7 @@ function update_display_users() {
             if (Math.abs(data.peek(i).x) > local_x_length) {
                 local_x_length = Math.abs(data.peek(i).x);
             }
-            if (Math.abs(data.peek(i).y) > local_y_length) {
+            if (Math.abs(data.peek(i).z) > local_y_length) {
                 local_y_length = Math.abs(data.peek(i).z);
             }
 
@@ -537,13 +546,13 @@ var x_length = 5;
 var y_length = 5;
 
 update_json_data();
-const json_fetch_interval = window.setInterval(update_json_data, 5000);
+const json_fetch_interval = window.setInterval(update_json_data, json_update_time);
 
 update_display();
-const display_interval = window.setInterval(update_display, 200);
+const display_interval = window.setInterval(update_display, canvas_update_time);
 
 update_events();
-const event_interval = window.setInterval(update_events, 1000);
+const event_interval = window.setInterval(update_events, event_update_time);
 
 
 
